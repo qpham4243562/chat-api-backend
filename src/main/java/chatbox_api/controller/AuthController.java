@@ -27,10 +27,11 @@ public class AuthController {
     private AuthenticationManager authenticationManager;
 
     @Autowired
-
     private MyUserDetailsService myUserDetailsService;
+
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private JWTUtil jwtUtil;
 
@@ -50,7 +51,7 @@ public class AuthController {
     // API Đăng nhập (Login)
     @Operation(security = { @SecurityRequirement(name = "bearerAuth"), @SecurityRequirement(name = "cookieAuth") })
     @PostMapping("/authenticate")
-    public ResponseEntity<?> createAuthenticationToken(@RequestBody User user) throws Exception {
+    public ResponseEntity<?> createAuthenticationToken(@RequestBody User user, HttpServletResponse response) throws Exception {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword())
@@ -62,8 +63,17 @@ public class AuthController {
         final UserDetails userDetails = myUserDetailsService.loadUserByUsername(user.getUsername());
         final String jwt = jwtUtil.generateToken(userDetails);
 
+        // Set JWT token in cookie
+        Cookie cookie = new Cookie("JWT_TOKEN", jwt);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true); // set to true if your application is using HTTPS
+        cookie.setMaxAge(24 * 60 * 60); // 1 day
+        cookie.setPath("/");
+        response.addCookie(cookie);
+
         return ResponseEntity.ok(new AuthenticationResponse(jwt));
     }
+
     // Tạo một lớp phản hồi mới
     public class AuthenticationResponse {
         private final String jwt;
@@ -76,7 +86,6 @@ public class AuthController {
             return jwt;
         }
     }
-
 
     // API Đăng xuất (Logout)
     @PostMapping("/logout")
