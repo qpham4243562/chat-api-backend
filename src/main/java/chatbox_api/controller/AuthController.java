@@ -17,10 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -197,5 +194,54 @@ public class AuthController {
             return response;
         }
     }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
 
+        // Tìm người dùng theo email
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            // Tạo mã đặt lại mật khẩu hoặc liên kết đặt lại mật khẩu
+            String resetToken = generateResetToken();
+            user.setResetToken(resetToken);  // Lưu mã này vào cơ sở dữ liệu cho người dùng
+            userRepository.save(user);
+
+            // Gửi email chứa mã xác thực hoặc liên kết đặt lại mật khẩu
+            String resetLink = "http://your-app-url/reset-password?token=" + resetToken;  // Liên kết đặt lại mật khẩu
+            String subject = "Password Reset Request";
+            String text = "Click the link below to reset your password: \n" + resetLink;
+            emailService.sendEmail(user.getEmail(), subject, text);
+
+            return ResponseEntity.ok("Password reset link has been sent to your email.");
+        } else {
+            return ResponseEntity.status(404).body("User with this email not found.");
+        }
+    }
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+        String token = request.get("token");
+        String newPassword = request.get("newPassword");
+
+        // Tìm người dùng dựa trên mã đặt lại mật khẩu (reset token)
+        Optional<User> optionalUser = userRepository.findByResetToken(token);
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            // Cập nhật mật khẩu mới
+            user.setPassword(passwordEncoder.encode(newPassword));
+            user.setResetToken(null);  // Xóa mã đặt lại sau khi đã sử dụng
+            userRepository.save(user);
+
+            return ResponseEntity.ok("Password has been reset successfully.");
+        } else {
+            return ResponseEntity.status(404).body("Invalid password reset token.");
+        }
+    }
+    private String generateResetToken() {
+        return UUID.randomUUID().toString();  // Tạo mã ngẫu nhiên
+    }
 }
