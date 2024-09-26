@@ -1,26 +1,30 @@
 package chatbox_api.controller;
 
+import chatbox_api.dto.ActivateAccountRequest;
+import chatbox_api.dto.ForgotPasswordRequest;
+import chatbox_api.dto.GenerateNewCodeRequest;
+import chatbox_api.dto.ResetPasswordRequest;
 import chatbox_api.model.User;
 import chatbox_api.repository.UserRepository;
 import chatbox_api.service.EmailService;
 import chatbox_api.service.MyUserDetailsService;
 import chatbox_api.util.JWTUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -44,14 +48,25 @@ public class AuthController {
     @Autowired
     private EmailService emailService;
 
+    @Operation(summary = "Register a new user", description = "API to register a new user",
+            requestBody = @RequestBody(content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                {
+                    "username": "john_doe",
+                    "password": "password123",
+                    "email": "john.doe@example.com"
+                }
+            """)
+            ))
+    )
     @PostMapping("/register")
     public Map<String, String> register(@RequestBody User user) {
         String activationCode = generateActivationCode();
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setActivationCode(activationCode);  // Store activation code
+        user.setActivationCode(activationCode);
         userRepository.save(user);
 
-        // Send the activation code to the user's email
         String subject = "Account Activation Code";
         String text = "Your activation code is: " + activationCode;
         emailService.sendEmail(user.getEmail(), subject, text);
@@ -66,30 +81,36 @@ public class AuthController {
         Random random = new Random();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < codeLength; i++) {
-            sb.append(random.nextInt(10));  // Generate a random digit
+            sb.append(random.nextInt(10));
         }
         return sb.toString();
     }
 
-    // API Đăng nhập (Login)
-    @Operation(security = { @SecurityRequirement(name = "bearerAuth"), @SecurityRequirement(name = "cookieAuth") })
+    @Operation(summary = "Authenticate a user", description = "API to authenticate and generate JWT token",
+            requestBody = @RequestBody(content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                {
+                    "username": "john_doe",
+                    "password": "password123"
+                }
+            """)
+            ))
+    )
     @PostMapping("/authenticate")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody User user, HttpServletResponse response) throws Exception {
-        Optional<User> dbUserOptional = userRepository.findByUsername(user.getUsername());  // Sử dụng Optional
+        Optional<User> dbUserOptional = userRepository.findByUsername(user.getUsername());
 
-        // Kiểm tra xem người dùng có tồn tại không
         if (!dbUserOptional.isPresent()) {
             throw new Exception("Incorrect username or password");
         }
 
-        User dbUser = dbUserOptional.get();  // Lấy đối tượng User từ Optional
+        User dbUser = dbUserOptional.get();
 
-        // Kiểm tra mật khẩu
         if (!passwordEncoder.matches(user.getPassword(), dbUser.getPassword())) {
             throw new Exception("Incorrect username or password");
         }
 
-        // Kiểm tra tài khoản có active hay chưa
         if (!dbUser.isActive()) {
             return ResponseEntity.badRequest().body("Account is not activated. Please check your email for the activation code.");
         }
@@ -100,16 +121,13 @@ public class AuthController {
         Cookie cookie = new Cookie("JWT_TOKEN", jwt);
         cookie.setHttpOnly(true);
         cookie.setSecure(true);
-        cookie.setMaxAge(24 * 60 * 60); // 1 day
+        cookie.setMaxAge(24 * 60 * 60);
         cookie.setPath("/");
         response.addCookie(cookie);
 
         return ResponseEntity.ok(new AuthenticationResponse(jwt));
     }
 
-
-
-    // Tạo một lớp phản hồi mới
     public class AuthenticationResponse {
         private final String jwt;
 
@@ -122,13 +140,11 @@ public class AuthController {
         }
     }
 
-    // API Đăng xuất (Logout)
     @PostMapping("/logout")
     public Map<String, String> logout(HttpServletResponse response) {
-        // Xóa cookie bằng cách đặt giá trị thời gian sống của cookie về 0
         Cookie jwtCookie = new Cookie("JWT_TOKEN", null);
         jwtCookie.setHttpOnly(true);
-        jwtCookie.setMaxAge(0);  // Cookie hết hạn ngay lập tức
+        jwtCookie.setMaxAge(0);
         jwtCookie.setPath("/");
         response.addCookie(jwtCookie);
 
@@ -136,20 +152,30 @@ public class AuthController {
         result.put("message", "Logged out successfully");
         return result;
     }
-    @PostMapping("/activate")
-    public Map<String, String> activateAccount(@RequestBody Map<String, String> request) {
-        String username = request.get("username");
-        String activationCode = request.get("activationCode");
 
-        // Sử dụng Optional để tìm User
+    @Operation(summary = "Activate account", description = "API to activate a user account",
+            requestBody = @RequestBody(content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+        {
+            "username": "john_doe",
+            "activationCode": "123456"
+        }
+        """)
+            ))
+    )
+    @PostMapping("/activate")
+    public Map<String, String> activateAccount(@RequestBody ActivateAccountRequest request) {
+        String username = request.getUsername();
+        String activationCode = request.getActivationCode();
+
         Optional<User> optionalUser = userRepository.findByUsername(username);
 
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
-            // Kiểm tra mã kích hoạt
             if (user.getActivationCode().equals(activationCode)) {
-                user.setActive(true);  // Kích hoạt tài khoản
-                user.setActivationCode(null);  // Xóa mã kích hoạt sau khi đã kích hoạt
+                user.setActive(true);
+                user.setActivationCode(null);
                 userRepository.save(user);
 
                 Map<String, String> response = new HashMap<>();
@@ -166,24 +192,31 @@ public class AuthController {
             return response;
         }
     }
-    @PostMapping("/generate-new-code")
-    public Map<String, String> generateNewActivationCode(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
 
-        // Tìm người dùng theo email
+
+    @Operation(summary = "Generate new activation code", description = "API to generate a new activation code and send via email",
+            requestBody = @RequestBody(content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+        {
+            "email": "john.doe@example.com"
+        }
+        """)
+            ))
+    )
+    @PostMapping("/generate-new-code")
+    public Map<String, String> generateNewActivationCode(@RequestBody GenerateNewCodeRequest request) {
+        String email = request.getEmail();
+
         Optional<User> optionalUser = userRepository.findByEmail(email);
 
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
 
-            // Tạo mã kích hoạt mới
             String newActivationCode = generateActivationCode();
             user.setActivationCode(newActivationCode);
-
-            // Lưu mã kích hoạt mới vào cơ sở dữ liệu
             userRepository.save(user);
 
-            // Gửi mã kích hoạt mới qua email
             String subject = "Your New Activation Code";
             String text = "Your new activation code is: " + newActivationCode;
             emailService.sendEmail(user.getEmail(), subject, text);
@@ -198,4 +231,75 @@ public class AuthController {
         }
     }
 
+
+    @Operation(summary = "Forgot password", description = "API to handle forgot password and send reset link",
+            requestBody = @RequestBody(content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+        {
+            "email": "john.doe@example.com"
+        }
+        """)
+            ))
+    )
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        String email = request.getEmail();
+
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            String resetToken = generateResetToken();
+            user.setResetToken(resetToken);
+            userRepository.save(user);
+
+            String resetLink = "http://your-app-url/reset-password?token=" + resetToken;
+            String subject = "Password Reset Request";
+            String text = "Click the link below to reset your password: \n" + resetLink;
+            emailService.sendEmail(user.getEmail(), subject, text);
+
+            return ResponseEntity.ok("Password reset link has been sent to your email.");
+        } else {
+            return ResponseEntity.status(404).body("User with this email not found.");
+        }
+    }
+
+
+    @Operation(summary = "Reset password", description = "API to reset a user's password",
+            requestBody = @RequestBody(content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+        {
+            "token": "abc123xyz",
+            "newPassword": "newStrongPassword123"
+        }
+        """)
+            ))
+    )
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        String token = request.getToken();
+        String newPassword = request.getNewPassword();
+
+        Optional<User> optionalUser = userRepository.findByResetToken(token);
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            user.setPassword(passwordEncoder.encode(newPassword));
+            user.setResetToken(null);
+            userRepository.save(user);
+
+            return ResponseEntity.ok("Password has been reset successfully.");
+        } else {
+            return ResponseEntity.status(404).body("Invalid password reset token.");
+        }
+    }
+
+
+    private String generateResetToken() {
+        return UUID.randomUUID().toString();
+    }
 }
