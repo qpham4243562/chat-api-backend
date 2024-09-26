@@ -1,4 +1,4 @@
-package chatbox_api.dto;
+package chatbox_api.response;
 
 public class ApiResponse<T> {
     private int statusCode;

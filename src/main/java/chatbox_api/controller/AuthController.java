@@ -4,6 +4,8 @@ import chatbox_api.config.GlobalResponseHandler;
 import chatbox_api.dto.*;
 import chatbox_api.model.User;
 import chatbox_api.repository.UserRepository;
+import chatbox_api.response.ApiResponse;
+import chatbox_api.response.ValidationError;
 import chatbox_api.service.EmailService;
 import chatbox_api.service.MyUserDetailsService;
 import chatbox_api.util.JWTUtil;
@@ -66,8 +68,15 @@ public class AuthController {
     public ResponseEntity<?> register(@Valid @RequestBody User user, BindingResult result) {
         // Kiểm tra lỗi xác thực
         if (result.hasErrors()) {
-            // Trả về ApiResponse với kiểu dữ liệu List<ObjectError> khi có lỗi xác thực
-            return globalResponseHandler.createSuccessResponse(result.getAllErrors(), "Validation error", HttpStatus.BAD_REQUEST);
+            List<ValidationError> errors = result.getFieldErrors().stream()
+                    .map(fieldError -> new ValidationError(
+                            fieldError.getField(),
+                            fieldError.getDefaultMessage(),
+                            fieldError.getRejectedValue()))
+                    .toList();
+
+            // Trả về ApiResponse với danh sách lỗi đơn giản
+            return globalResponseHandler.createSuccessResponse(errors, "Validation error", HttpStatus.BAD_REQUEST);
         }
 
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
@@ -94,7 +103,7 @@ public class AuthController {
             return globalResponseHandler.createSuccessResponse(null, "An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     private String generateActivationCode() {
         int codeLength = 6;
         Random random = new Random();
