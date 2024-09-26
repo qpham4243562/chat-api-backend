@@ -12,9 +12,6 @@ import chatbox_api.util.JWTUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +46,7 @@ public class AuthController {
     private EmailService emailService;
 
     @Operation(summary = "Register a new user", description = "API to register a new user",
-            requestBody = @RequestBody(content = @Content(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = """
                 {
@@ -87,7 +84,7 @@ public class AuthController {
     }
 
     @Operation(summary = "Authenticate a user", description = "API to authenticate and generate JWT token",
-            requestBody = @RequestBody(content = @Content(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = """
                 {
@@ -154,7 +151,7 @@ public class AuthController {
     }
 
     @Operation(summary = "Activate account", description = "API to activate a user account",
-            requestBody = @RequestBody(content = @Content(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = """
         {
@@ -195,7 +192,7 @@ public class AuthController {
 
 
     @Operation(summary = "Generate new activation code", description = "API to generate a new activation code and send via email",
-            requestBody = @RequestBody(content = @Content(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = """
         {
@@ -233,7 +230,7 @@ public class AuthController {
 
 
     @Operation(summary = "Forgot password", description = "API to handle forgot password and send reset link",
-            requestBody = @RequestBody(content = @Content(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = """
         {
@@ -268,7 +265,7 @@ public class AuthController {
 
 
     @Operation(summary = "Reset password", description = "API to reset a user's password",
-            requestBody = @RequestBody(content = @Content(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = """
         {
