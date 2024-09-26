@@ -1,24 +1,28 @@
 package chatbox_api.controller;
 
-import chatbox_api.dto.ActivateAccountRequest;
-import chatbox_api.dto.ForgotPasswordRequest;
-import chatbox_api.dto.GenerateNewCodeRequest;
-import chatbox_api.dto.ResetPasswordRequest;
+import chatbox_api.config.GlobalResponseHandler;
+import chatbox_api.dto.*;
 import chatbox_api.model.User;
 import chatbox_api.repository.UserRepository;
+import chatbox_api.response.ApiResponse;
+import chatbox_api.response.ValidationError;
 import chatbox_api.service.EmailService;
 import chatbox_api.service.MyUserDetailsService;
 import chatbox_api.util.JWTUtil;
+import com.mongodb.DuplicateKeyException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -45,6 +49,9 @@ public class AuthController {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private GlobalResponseHandler globalResponseHandler;
+
     @Operation(summary = "Register a new user", description = "API to register a new user",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
                     mediaType = "application/json",
@@ -58,19 +65,43 @@ public class AuthController {
             ))
     )
     @PostMapping("/register")
-    public Map<String, String> register(@RequestBody User user) {
-        String activationCode = generateActivationCode();
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setActivationCode(activationCode);
-        userRepository.save(user);
+    public ResponseEntity<?> register(@Valid @RequestBody User user, BindingResult result) {
+        // Kiểm tra lỗi xác thực
+        if (result.hasErrors()) {
+            List<ValidationError> errors = result.getFieldErrors().stream()
+                    .map(fieldError -> new ValidationError(
+                            fieldError.getField(),
+                            fieldError.getDefaultMessage(),
+                            fieldError.getRejectedValue()))
+                    .toList();
 
-        String subject = "Account Activation Code";
-        String text = "Your activation code is: " + activationCode;
-        emailService.sendEmail(user.getEmail(), subject, text);
+            // Trả về ApiResponse với danh sách lỗi đơn giản
+            return globalResponseHandler.createSuccessResponse(errors, "Validation error", HttpStatus.BAD_REQUEST);
+        }
 
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "User registered successfully. Please check your email for the activation code.");
-        return response;
+        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
+            return globalResponseHandler.createSuccessResponse(null, "Username is already taken", HttpStatus.BAD_REQUEST);
+        }
+
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+            return globalResponseHandler.createSuccessResponse(null, "Email is already taken", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            String activationCode = generateActivationCode();
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
+            user.setActivationCode(activationCode);
+            userRepository.save(user);
+
+            String subject = "Account Activation Code";
+            String text = "Your activation code is: " + activationCode;
+            emailService.sendEmail(user.getEmail(), subject, text);
+
+            // Trả về ApiResponse với kiểu dữ liệu User khi đăng ký thành công
+            return globalResponseHandler.createSuccessResponse(user, "User registered successfully. Please check your email for the activation code.", HttpStatus.OK);
+        } catch (DuplicateKeyException e) {
+            return globalResponseHandler.createSuccessResponse(null, "An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     private String generateActivationCode() {
@@ -95,21 +126,21 @@ public class AuthController {
             ))
     )
     @PostMapping("/authenticate")
-    public ResponseEntity<?> createAuthenticationToken(@RequestBody User user, HttpServletResponse response) throws Exception {
+    public ResponseEntity<ApiResponse<AuthenticationResponse>> createAuthenticationToken(@RequestBody User user, HttpServletResponse response) {
         Optional<User> dbUserOptional = userRepository.findByUsername(user.getUsername());
 
         if (!dbUserOptional.isPresent()) {
-            throw new Exception("Incorrect username or password");
+            return globalResponseHandler.createSuccessResponse(null, "Incorrect username or password", HttpStatus.BAD_REQUEST);
         }
 
         User dbUser = dbUserOptional.get();
 
         if (!passwordEncoder.matches(user.getPassword(), dbUser.getPassword())) {
-            throw new Exception("Incorrect username or password");
+            return globalResponseHandler.createSuccessResponse(null, "Incorrect username or password", HttpStatus.BAD_REQUEST);
         }
 
         if (!dbUser.isActive()) {
-            return ResponseEntity.badRequest().body("Account is not activated. Please check your email for the activation code.");
+            return globalResponseHandler.createSuccessResponse(null, "Account is not activated. Please check your email for the activation code.", HttpStatus.BAD_REQUEST);
         }
 
         final UserDetails userDetails = myUserDetailsService.loadUserByUsername(user.getUsername());
@@ -122,7 +153,7 @@ public class AuthController {
         cookie.setPath("/");
         response.addCookie(cookie);
 
-        return ResponseEntity.ok(new AuthenticationResponse(jwt));
+        return globalResponseHandler.createSuccessResponse(new AuthenticationResponse(jwt), "Authenticated successfully", HttpStatus.OK);
     }
 
     public class AuthenticationResponse {
@@ -138,16 +169,14 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Map<String, String> logout(HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<String>> logout(HttpServletResponse response) {
         Cookie jwtCookie = new Cookie("JWT_TOKEN", null);
         jwtCookie.setHttpOnly(true);
         jwtCookie.setMaxAge(0);
         jwtCookie.setPath("/");
         response.addCookie(jwtCookie);
 
-        Map<String, String> result = new HashMap<>();
-        result.put("message", "Logged out successfully");
-        return result;
+        return globalResponseHandler.createSuccessResponse("Logged out successfully", "Success", HttpStatus.OK);
     }
 
     @Operation(summary = "Activate account", description = "API to activate a user account",
@@ -162,7 +191,7 @@ public class AuthController {
             ))
     )
     @PostMapping("/activate")
-    public Map<String, String> activateAccount(@RequestBody ActivateAccountRequest request) {
+    public ResponseEntity<ApiResponse<String>> activateAccount(@RequestBody ActivateAccountRequest request) {
         String username = request.getUsername();
         String activationCode = request.getActivationCode();
 
@@ -175,18 +204,12 @@ public class AuthController {
                 user.setActivationCode(null);
                 userRepository.save(user);
 
-                Map<String, String> response = new HashMap<>();
-                response.put("message", "Account activated successfully.");
-                return response;
+                return globalResponseHandler.createSuccessResponse("Account activated successfully.", "Success", HttpStatus.OK);
             } else {
-                Map<String, String> response = new HashMap<>();
-                response.put("error", "Invalid activation code.");
-                return response;
+                return globalResponseHandler.createSuccessResponse(null, "Invalid activation code.", HttpStatus.BAD_REQUEST);
             }
         } else {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "User not found.");
-            return response;
+            return globalResponseHandler.createSuccessResponse(null, "User not found.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -202,7 +225,7 @@ public class AuthController {
             ))
     )
     @PostMapping("/generate-new-code")
-    public Map<String, String> generateNewActivationCode(@RequestBody GenerateNewCodeRequest request) {
+    public ResponseEntity<ApiResponse<String>> generateNewActivationCode(@RequestBody GenerateNewCodeRequest request) {
         String email = request.getEmail();
 
         Optional<User> optionalUser = userRepository.findByEmail(email);
@@ -218,13 +241,9 @@ public class AuthController {
             String text = "Your new activation code is: " + newActivationCode;
             emailService.sendEmail(user.getEmail(), subject, text);
 
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "New activation code generated and sent to your email.");
-            return response;
+            return globalResponseHandler.createSuccessResponse("New activation code generated and sent to your email.", "Success", HttpStatus.OK);
         } else {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "User with this email not found.");
-            return response;
+            return globalResponseHandler.createSuccessResponse(null, "User with this email not found.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -240,7 +259,7 @@ public class AuthController {
             ))
     )
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
         String email = request.getEmail();
 
         Optional<User> optionalUser = userRepository.findByEmail(email);
@@ -257,9 +276,9 @@ public class AuthController {
             String text = "Click the link below to reset your password: \n" + resetLink;
             emailService.sendEmail(user.getEmail(), subject, text);
 
-            return ResponseEntity.ok("Password reset link has been sent to your email.");
+            return globalResponseHandler.createSuccessResponse("Password reset link has been sent to your email.", "Success", HttpStatus.OK);
         } else {
-            return ResponseEntity.status(404).body("User with this email not found.");
+            return globalResponseHandler.createSuccessResponse(null, "User with this email not found.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -276,7 +295,7 @@ public class AuthController {
             ))
     )
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody ResetPasswordRequest request) {
         String token = request.getToken();
         String newPassword = request.getNewPassword();
 
@@ -289,9 +308,9 @@ public class AuthController {
             user.setResetToken(null);
             userRepository.save(user);
 
-            return ResponseEntity.ok("Password has been reset successfully.");
+            return globalResponseHandler.createSuccessResponse("Password has been reset successfully.", "Success", HttpStatus.OK);
         } else {
-            return ResponseEntity.status(404).body("Invalid password reset token.");
+            return globalResponseHandler.createSuccessResponse(null, "Invalid password reset token.", HttpStatus.BAD_REQUEST);
         }
     }
 
