@@ -166,6 +166,36 @@ public class AuthController {
             return response;
         }
     }
+    @PostMapping("/generate-new-code")
+    public Map<String, String> generateNewActivationCode(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
 
+        // Tìm người dùng theo email
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            // Tạo mã kích hoạt mới
+            String newActivationCode = generateActivationCode();
+            user.setActivationCode(newActivationCode);
+
+            // Lưu mã kích hoạt mới vào cơ sở dữ liệu
+            userRepository.save(user);
+
+            // Gửi mã kích hoạt mới qua email
+            String subject = "Your New Activation Code";
+            String text = "Your new activation code is: " + newActivationCode;
+            emailService.sendEmail(user.getEmail(), subject, text);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "New activation code generated and sent to your email.");
+            return response;
+        } else {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "User with this email not found.");
+            return response;
+        }
+    }
 
 }
