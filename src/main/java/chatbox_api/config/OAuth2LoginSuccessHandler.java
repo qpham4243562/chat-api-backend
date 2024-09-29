@@ -5,6 +5,7 @@ import chatbox_api.repository.UserRepository;
 import chatbox_api.response.ApiResponse;
 import chatbox_api.util.JWTUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -49,6 +50,14 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         String jwt = jwtUtil.generateToken(new org.springframework.security.core.userdetails.User(
                 user.getUsername(), "", Collections.emptyList()));
 
+        // Tạo và thêm cookie chứa JWT token vào phản hồi
+        Cookie jwtCookie = new Cookie("JWT_TOKEN", jwt);
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setSecure(true); // Đặt là true nếu bạn sử dụng HTTPS
+        jwtCookie.setMaxAge(24 * 60 * 60); // Thiết lập thời gian hết hạn, ví dụ: 1 ngày
+        jwtCookie.setPath("/");
+        response.addCookie(jwtCookie);
+
         // Tạo phản hồi ApiResponse trả về JWT và thông tin người dùng
         ApiResponse<Object> apiResponse = createApiResponse(user, jwt);
 
@@ -59,6 +68,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         // Ghi dữ liệu JSON vào phản hồi
         objectMapper.writeValue(response.getWriter(), apiResponse);
     }
+
 
     // Phương thức hỗ trợ để đăng ký người dùng mới nếu không tồn tại
     private User registerNewUser(String email, String name) {
