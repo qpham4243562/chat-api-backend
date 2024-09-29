@@ -324,18 +324,5 @@ public class AuthController {
         // Điều hướng người dùng đến trang đăng nhập Google
         response.sendRedirect("/oauth2/authorization/google");
     }
-    @GetMapping("/loginSuccess")
-    public ResponseEntity<Map<String, String>> loginSuccess() {
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Login with Google was successful!");
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/loginFailure")
-    public ResponseEntity<Map<String, String>> loginFailure() {
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Login with Google failed!");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-    }
 
 }
