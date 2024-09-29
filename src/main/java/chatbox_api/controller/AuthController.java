@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.*;
 
 @RestController
@@ -318,4 +319,23 @@ public class AuthController {
     private String generateResetToken() {
         return UUID.randomUUID().toString();
     }
+    @GetMapping("/login/google")
+    public void redirectToGoogle(HttpServletResponse response) throws IOException {
+        // Điều hướng người dùng đến trang đăng nhập Google
+        response.sendRedirect("/oauth2/authorization/google");
+    }
+    @GetMapping("/loginSuccess")
+    public ResponseEntity<Map<String, String>> loginSuccess() {
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Login with Google was successful!");
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/loginFailure")
+    public ResponseEntity<Map<String, String>> loginFailure() {
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Login with Google failed!");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
 }
