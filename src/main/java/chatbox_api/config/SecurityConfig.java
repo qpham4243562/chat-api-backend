@@ -46,6 +46,8 @@ public class SecurityConfig {
 
     @Autowired
     private OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
+    @Autowired
+    private CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -61,7 +63,10 @@ public class SecurityConfig {
                         .successHandler(oauth2LoginSuccessHandler)
                         .userInfoEndpoint(userInfo -> userInfo.userService(oauth2UserService()))
                 )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(customAuthenticationEntryPoint) // Sử dụng EntryPoint tùy chỉnh
+                );
 
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
