@@ -22,13 +22,9 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         this.objectMapper = new ObjectMapper();
     }
 
+    // Ghi đè `commence` method để xử lý lỗi xác thực
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
-        // Tạo ApiResponse với thông tin lỗi
-        if (request.getRequestURI().startsWith("/v3/api-docs") || request.getRequestURI().startsWith("/swagger-ui")) {
-            response.sendError(HttpServletResponse.SC_OK, "Access granted for Swagger");
-            return;
-        }
         ApiResponse<Object> apiResponse = new ApiResponse<>(
                 HttpStatus.UNAUTHORIZED.value(),
                 "Unauthorized access - Please log in.",
@@ -43,4 +39,5 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         // Ghi phản hồi JSON vào response
         objectMapper.writeValue(response.getWriter(), apiResponse);
     }
+
 }
