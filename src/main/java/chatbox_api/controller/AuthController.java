@@ -90,6 +90,7 @@ public class AuthController {
 
         try {
             String activationCode = generateActivationCode();
+            user.setRole("ADMIN");
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setActivationCode(activationCode);
             userRepository.save(user);
