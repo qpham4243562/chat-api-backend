@@ -51,13 +51,13 @@ public class JWTUtil {
     }
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(userDetails.getUsername());
+        Map<String, Object> claims = new HashMap<>();
+        // Assuming userDetails has a method to get authorities (roles)
+        String role = userDetails.getAuthorities().iterator().next().getAuthority();
+        claims.put("role", role);
+        return createToken(claims, userDetails.getUsername());
     }
 
-    public String generateToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, username);
-    }
 
     private String createToken(Map<String, Object> claims, String subject) {
         return Jwts.builder()

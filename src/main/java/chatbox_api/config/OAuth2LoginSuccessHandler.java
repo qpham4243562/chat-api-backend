@@ -5,9 +5,11 @@ import chatbox_api.repository.UserRepository;
 import chatbox_api.response.ApiResponse;
 import chatbox_api.util.JWTUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -42,12 +44,27 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         String email = oauth2Token.getPrincipal().getAttribute("email");
         String name = oauth2Token.getPrincipal().getAttribute("name");
 
+        // Kiểm tra thông tin email và name có null không
+        if (email == null || name == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "User information is incomplete.");
+            return;
+        }
+
         // Tìm hoặc tạo mới người dùng trong database
         User user = userRepository.findByEmail(email).orElseGet(() -> registerNewUser(email, name));
 
-        // Tạo JWT token cho người dùng
+        // Kiểm tra role của người dùng và tạo JWT token
+        String role = (user.getRole() != null) ? user.getRole() : "USER";
         String jwt = jwtUtil.generateToken(new org.springframework.security.core.userdetails.User(
-                user.getUsername(), "", Collections.emptyList()));
+                user.getUsername(), "", AuthorityUtils.createAuthorityList("ROLE_" + role)));
+
+        // Tạo và thêm cookie chứa JWT token vào phản hồi
+        Cookie jwtCookie = new Cookie("JWT_TOKEN", jwt);
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setSecure(true); // Đặt là true nếu bạn sử dụng HTTPS
+        jwtCookie.setMaxAge(24 * 60 * 60); // Thiết lập thời gian hết hạn, ví dụ: 1 ngày
+        jwtCookie.setPath("/");
+        response.addCookie(jwtCookie);
 
         // Tạo phản hồi ApiResponse trả về JWT và thông tin người dùng
         ApiResponse<Object> apiResponse = createApiResponse(user, jwt);
@@ -62,6 +79,13 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     // Phương thức hỗ trợ để đăng ký người dùng mới nếu không tồn tại
     private User registerNewUser(String email, String name) {
+        // Kiểm tra xem người dùng với email này đã tồn tại chưa
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            return existingUser.get(); // Nếu đã tồn tại, trả về người dùng đó
+        }
+
+        // Nếu không tồn tại, tạo mới người dùng
         User newUser = new User();
         newUser.setEmail(email);
         newUser.setUsername(name);
