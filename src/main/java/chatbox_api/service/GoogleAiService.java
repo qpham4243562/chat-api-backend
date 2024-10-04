@@ -9,34 +9,40 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
-public class ChatGptService {
+public class GoogleAiService {
 
-    @Value("${openai.api.key}")
-    private String openaiApiKey;
+    @Value("${google.ai.api.key}")
+    private String googleApiKey;
 
-    @Value("${openai.api.url}")
-    private String openaiApiUrl;
+    @Value("${google.ai.api.url}")
+    private String googleApiUrl;
 
     private final RestTemplate restTemplate;
 
-    public ChatGptService(RestTemplate restTemplate) {
+    public GoogleAiService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    public String chatWithGpt(String message) {
+    public String callGeminiApi(String inputText) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + openaiApiKey);
         headers.set("Content-Type", "application/json");
 
         Map<String, Object> body = new HashMap<>();
-        body.put("model", "gpt-3.5-turbo");
-        body.put("messages", new Map[] { Map.of("role", "user", "content", message) });
+        body.put("contents", List.of(Map.of("parts", List.of(Map.of("text", inputText)))));
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.exchange(openaiApiUrl, HttpMethod.POST, entity, String.class);
+
+        String url = googleApiUrl + "?key=" + googleApiKey;
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                String.class
+        );
 
         return response.getBody();
     }
