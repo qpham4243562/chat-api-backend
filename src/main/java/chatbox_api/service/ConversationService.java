@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ConversationService {
@@ -20,17 +19,14 @@ public class ConversationService {
     }
 
     public String getOrCreateConversationId(String username, String firstMessage) {
-        // Tìm kiếm cuộc hội thoại dựa trên `username`
         List<Conversation> existingConversations = conversationRepository.findByUsername(username);
 
         if (!existingConversations.isEmpty()) {
-            // Lấy cuộc hội thoại đầu tiên trong danh sách (nếu có)
             return existingConversations.get(0).getId();
         } else {
-            // Nếu không có, tạo cuộc hội thoại mới
             Conversation newConversation = new Conversation();
-            newConversation.setUsername(username); // Lưu username
-            newConversation.setTitle(firstMessage); // Thiết lập tiêu đề bằng tin nhắn đầu tiên
+            newConversation.setUsername(username);
+            newConversation.setTitle(firstMessage);
             newConversation.setMessages(new ArrayList<>());
             newConversation.setTimestamp(LocalDateTime.now().toString());
             Conversation savedConversation = conversationRepository.save(newConversation);
@@ -38,22 +34,17 @@ public class ConversationService {
         }
     }
 
-
-
     public List<Conversation> findConversationsByUsername(String username) {
         return conversationRepository.findByUsername(username);
     }
 
-
-    public void addMessageToConversation(String conversationId, String sender, String content) {
+    public void addMessageToConversation(String conversationId, String sender, String content, String contentType) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
 
-        // Lưu nội dung tin nhắn của người dùng, không lưu chuỗi JSON
-        Message message = new Message(sender, content, LocalDateTime.now().toString());
+        Message message = new Message(sender, content, LocalDateTime.now().toString(), contentType);
         conversation.getMessages().add(message);
 
-        // Lưu cuộc hội thoại lại vào database
         conversationRepository.save(conversation);
     }
 
@@ -62,4 +53,7 @@ public class ConversationService {
                 .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
     }
 
+    public void addImageToConversation(String conversationId, String sender, String imageBase64) {
+        addMessageToConversation(conversationId, sender, imageBase64, "image");
+    }
 }

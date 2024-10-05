@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,18 +47,47 @@ public class GoogleAiService {
                 String.class
         );
 
-        // Trích xuất phần "text" từ phản hồi
-        String responseBody = response.getBody();
-        // Bạn cần phân tích JSON của phản hồi để lấy giá trị "text" từ các "candidates"
-        // Đơn giản hóa: Giả sử rằng JSON phản hồi có thể phân tích và lấy phần "text"
-        String extractedText = extractTextFromResponse(responseBody);
-
-        return extractedText;
+        return extractTextFromResponse(response.getBody());
     }
 
+    public String callGeminiApiWithImage(byte[] imageBytes) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Content-Type", "application/json");
+
+        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+        Map<String, Object> imagePart = new HashMap<>();
+        imagePart.put("inline_data", Map.of(
+                "mime_type", "image/jpeg",
+                "data", base64Image
+        ));
+
+        Map<String, Object> textPart = new HashMap<>();
+        textPart.put("text", "What's in this image?");
+
+        List<Map<String, Object>> parts = List.of(imagePart, textPart);
+
+        Map<String, Object> content = new HashMap<>();
+        content.put("parts", parts);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("contents", List.of(content));
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        String url = googleApiUrl + "?key=" + googleApiKey;
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                String.class
+        );
+
+        return extractTextFromResponse(response.getBody());
+    }
+
+
     private String extractTextFromResponse(String responseBody) {
-        // Giả sử bạn dùng ObjectMapper hoặc thư viện JSON khác để phân tích và lấy text
-        // Đây là ví dụ về cách phân tích JSON:
         ObjectMapper objectMapper = new ObjectMapper();
         String text = "";
         try {
@@ -69,4 +99,3 @@ public class GoogleAiService {
         return text;
     }
 }
-

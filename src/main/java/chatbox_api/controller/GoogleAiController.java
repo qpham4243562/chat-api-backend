@@ -23,4 +23,5 @@ public class GoogleAiController {
     public String generateContent(@RequestParam String text) {
         return googleAiService.callGeminiApi(text);
     }
+
 }

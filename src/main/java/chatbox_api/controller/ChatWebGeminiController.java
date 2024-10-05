@@ -4,15 +4,15 @@ import chatbox_api.model.Conversation;
 import chatbox_api.model.Message;
 import chatbox_api.service.ConversationService;
 import chatbox_api.service.GoogleAiService;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+
 @RestController
 @Controller
 @RequestMapping("/api/conversations")
@@ -30,18 +30,43 @@ public class ChatWebGeminiController {
     @SendTo("/topic/messages")
     public String handleChatMessage(String message) throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> messageMap = objectMapper.readValue(message, Map.class);
+        Map<String, Object> messageMap = objectMapper.readValue(message, Map.class);
 
-        String username = messageMap.get("username");
-        String userMessage = messageMap.get("message");
+        String username = (String) messageMap.get("username");
+        String conversationId = (String) messageMap.get("conversationId");
 
-        // Nếu là tin nhắn đầu tiên, dùng nó làm tiêu đề của cuộc hội thoại
-        String conversationId = conversationService.getOrCreateConversationId(username, userMessage);
+        Object userMessageObj = messageMap.get("message");
+        String userMessage;
+        String contentType = "text";
 
-        conversationService.addMessageToConversation(conversationId, username, userMessage);
+        if (userMessageObj instanceof String) {
+            userMessage = (String) userMessageObj;
+        } else if (userMessageObj instanceof Map) {
+            Map<String, Object> messageContent = (Map<String, Object>) userMessageObj;
+            contentType = (String) messageContent.get("type");
+            userMessage = (String) messageContent.get("content");
+        } else {
+            throw new RuntimeException("Unsupported message format");
+        }
 
-        String aiResponse = googleAiService.callGeminiApi(userMessage);
-        conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse);
+        if (conversationId == null) {
+            conversationId = conversationService.getOrCreateConversationId(username, userMessage);
+        }
+
+        // Save user message to conversation
+        conversationService.addMessageToConversation(conversationId, username, userMessage, contentType);
+
+        String aiResponse;
+        if (contentType.equals("image")) {
+            // Process image with Gemini API
+            aiResponse = googleAiService.callGeminiApiWithImage(userMessage.getBytes());
+        } else {
+            // Process text with Gemini API
+            aiResponse = googleAiService.callGeminiApi(userMessage);
+        }
+
+        // Save AI response to conversation
+        conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse, "text");
 
         return aiResponse;
     }
@@ -52,7 +77,6 @@ public class ChatWebGeminiController {
         return conversation.getMessages();
     }
 
-    // Lấy tất cả đoạn hội thoại dựa trên `username`
     @GetMapping("/by-username")
     public List<Conversation> getConversationsByUsername(@RequestParam String username) {
         return conversationService.findConversationsByUsername(username);
