@@ -1,49 +1,65 @@
 package chatbox_api.service;
 
 import chatbox_api.model.Conversation;
+import chatbox_api.model.Message;
 import chatbox_api.repository.ConversationRepository;
 import org.springframework.stereotype.Service;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ConversationService(ConversationRepository conversationRepository) {
         this.conversationRepository = conversationRepository;
     }
 
-    // Hàm lưu tin nhắn của người dùng
-    public void saveUserMessage(String userId, String message) {
-        Conversation userConversation = new Conversation();
-        userConversation.setUserId(userId);
-        userConversation.setMessage(message);
-        userConversation.setTimestamp(LocalDateTime.now().toString());
-        conversationRepository.save(userConversation);
-    }
+    public String getOrCreateConversationId(String username, String firstMessage) {
+        // Tìm kiếm cuộc hội thoại dựa trên `username`
+        List<Conversation> existingConversations = conversationRepository.findByUsername(username);
 
-    // Hàm lưu phản hồi từ AI
-    public void saveAiResponse(String aiUsername, String aiResponse) {
-        try {
-            // Parse nội dung tin nhắn từ phản hồi JSON của AI
-            JsonNode responseNode = objectMapper.readTree(aiResponse);
-            String aiMessage = responseNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
-
-            // Lưu tin nhắn của AI vào database với `username` là "GEMINI"
-            Conversation aiConversation = new Conversation();
-            aiConversation.setUserId(aiUsername);
-            aiConversation.setMessage(aiMessage);
-            aiConversation.setTimestamp(LocalDateTime.now().toString());
-            conversationRepository.save(aiConversation);
-        } catch (IOException e) {
-            e.printStackTrace();
-            // Handle exception nếu cần
+        if (!existingConversations.isEmpty()) {
+            // Lấy cuộc hội thoại đầu tiên trong danh sách (nếu có)
+            return existingConversations.get(0).getId();
+        } else {
+            // Nếu không có, tạo cuộc hội thoại mới
+            Conversation newConversation = new Conversation();
+            newConversation.setUsername(username); // Lưu username
+            newConversation.setTitle(firstMessage); // Thiết lập tiêu đề bằng tin nhắn đầu tiên
+            newConversation.setMessages(new ArrayList<>());
+            newConversation.setTimestamp(LocalDateTime.now().toString());
+            Conversation savedConversation = conversationRepository.save(newConversation);
+            return savedConversation.getId();
         }
     }
+
+
+
+    public List<Conversation> findConversationsByUsername(String username) {
+        return conversationRepository.findByUsername(username);
+    }
+
+
+    public void addMessageToConversation(String conversationId, String sender, String content) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        // Lưu nội dung tin nhắn của người dùng, không lưu chuỗi JSON
+        Message message = new Message(sender, content, LocalDateTime.now().toString());
+        conversation.getMessages().add(message);
+
+        // Lưu cuộc hội thoại lại vào database
+        conversationRepository.save(conversation);
+    }
+
+    public Conversation findById(String conversationId) {
+        return conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+    }
+
 }

@@ -3,24 +3,26 @@ package chatbox_api.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.List;
+
 @Document(collection = "conversations")
 public class Conversation {
     @Id
     private String id;
-    private String userId;
-    private String message;
-    private String response;
+    private String title;
+    private List<Message> messages;
     private String timestamp;
+    private String username;
 
     public Conversation() {
     }
 
-    public Conversation(String id, String userId, String timestamp, String response, String message) {
+    public Conversation(String id, String title, List<Message> messages, String timestamp, String username) {
         this.id = id;
-        this.userId = userId;
+        this.title = title;
+        this.messages = messages;
         this.timestamp = timestamp;
-        this.response = response;
-        this.message = message;
+        this.username = username;
     }
 
     public String getId() {
@@ -31,28 +33,20 @@ public class Conversation {
         this.id = id;
     }
 
-    public String getUserId() {
-        return userId;
+    public String getTitle() {
+        return title;
     }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
+    public void setTitle(String title) {
+        this.title = title;
     }
 
-    public String getMessage() {
-        return message;
+    public List<Message> getMessages() {
+        return messages;
     }
 
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public String getResponse() {
-        return response;
-    }
-
-    public void setResponse(String response) {
-        this.response = response;
+    public void setMessages(List<Message> messages) {
+        this.messages = messages;
     }
 
     public String getTimestamp() {
@@ -62,4 +56,13 @@ public class Conversation {
     public void setTimestamp(String timestamp) {
         this.timestamp = timestamp;
     }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
 }
+

@@ -1,5 +1,7 @@
 package chatbox_api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -44,6 +46,27 @@ public class GoogleAiService {
                 String.class
         );
 
-        return response.getBody();
+        // Trích xuất phần "text" từ phản hồi
+        String responseBody = response.getBody();
+        // Bạn cần phân tích JSON của phản hồi để lấy giá trị "text" từ các "candidates"
+        // Đơn giản hóa: Giả sử rằng JSON phản hồi có thể phân tích và lấy phần "text"
+        String extractedText = extractTextFromResponse(responseBody);
+
+        return extractedText;
+    }
+
+    private String extractTextFromResponse(String responseBody) {
+        // Giả sử bạn dùng ObjectMapper hoặc thư viện JSON khác để phân tích và lấy text
+        // Đây là ví dụ về cách phân tích JSON:
+        ObjectMapper objectMapper = new ObjectMapper();
+        String text = "";
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            text = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return text;
     }
 }
+

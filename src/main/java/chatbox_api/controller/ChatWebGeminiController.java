@@ -1,14 +1,21 @@
 package chatbox_api.controller;
 
+import chatbox_api.model.Conversation;
+import chatbox_api.model.Message;
 import chatbox_api.service.ConversationService;
 import chatbox_api.service.GoogleAiService;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Map;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+@RestController
 @Controller
+@RequestMapping("/api/conversations")
 public class ChatWebGeminiController {
 
     private final GoogleAiService googleAiService;
@@ -22,23 +29,32 @@ public class ChatWebGeminiController {
     @MessageMapping("/chat")
     @SendTo("/topic/messages")
     public String handleChatMessage(String message) throws Exception {
-        // Parse `userId` và `message` từ JSON string
         ObjectMapper objectMapper = new ObjectMapper();
         Map<String, String> messageMap = objectMapper.readValue(message, Map.class);
 
-        String userId = messageMap.get("userId");
+        String username = messageMap.get("username");
         String userMessage = messageMap.get("message");
 
-        // Bước 1: Lưu tin nhắn người dùng vào database
-        conversationService.saveUserMessage(userId, userMessage);
+        // Nếu là tin nhắn đầu tiên, dùng nó làm tiêu đề của cuộc hội thoại
+        String conversationId = conversationService.getOrCreateConversationId(username, userMessage);
 
-        // Bước 2: Gọi API Google AI để lấy phản hồi
+        conversationService.addMessageToConversation(conversationId, username, userMessage);
+
         String aiResponse = googleAiService.callGeminiApi(userMessage);
+        conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse);
 
-        // Lưu phản hồi từ AI vào database với `username` là "GEMINI"
-        conversationService.saveAiResponse("GEMINI", aiResponse);
-
-        // Trả lại phản hồi qua WebSocket
         return aiResponse;
+    }
+
+    @GetMapping("/{conversationId}")
+    public List<Message> getMessagesByConversationId(@PathVariable String conversationId) {
+        Conversation conversation = conversationService.findById(conversationId);
+        return conversation.getMessages();
+    }
+
+    // Lấy tất cả đoạn hội thoại dựa trên `username`
+    @GetMapping("/by-username")
+    public List<Conversation> getConversationsByUsername(@RequestParam String username) {
+        return conversationService.findConversationsByUsername(username);
     }
 }
