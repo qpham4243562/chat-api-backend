@@ -3,6 +3,7 @@ package chatbox_api.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "conversations")
@@ -42,6 +43,9 @@ public class Conversation {
     }
 
     public List<Message> getMessages() {
+        if (this.messages == null) {
+            this.messages = new ArrayList<>(); // Đảm bảo danh sách không null
+        }
         return messages;
     }
 
@@ -63,6 +67,12 @@ public class Conversation {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+    public void addMessage(Message message) {
+        if (this.messages == null) {
+            this.messages = new ArrayList<>();
+        }
+        this.messages.add(message);
     }
 }
 
