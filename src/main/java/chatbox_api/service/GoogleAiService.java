@@ -40,6 +40,9 @@ public class GoogleAiService {
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         String url = googleApiUrl + "?key=" + googleApiKey;
+
+        // Thêm log để theo dõi
+        System.out.println("Sending request to Google AI with text: " + inputText);
         ResponseEntity<String> response = restTemplate.exchange(
                 url,
                 HttpMethod.POST,
@@ -47,8 +50,11 @@ public class GoogleAiService {
                 String.class
         );
 
-        return extractTextFromResponse(response.getBody());
+        String result = extractTextFromResponse(response.getBody());
+        System.out.println("Extracted response from Google AI: " + result);
+        return result;
     }
+
 
     public String callGeminiApiWithImage(byte[] imageBytes) {
         HttpHeaders headers = new HttpHeaders();

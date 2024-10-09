@@ -65,5 +65,7 @@ public class ImageController {
             response.put("message", "Error processing file: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
+
     }
+
 }
