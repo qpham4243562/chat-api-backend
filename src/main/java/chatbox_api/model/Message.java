@@ -8,6 +8,7 @@ public class Message {
     private String timestamp;
     private String contentType; // "text" or "image"
 
+
     public Message() {}
 
     public Message(String sender, String content, String timestamp, String contentType) {
