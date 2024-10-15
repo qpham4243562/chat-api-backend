@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @Controller
@@ -41,14 +42,34 @@ public class ChatWebGeminiController {
         String conversationId = (String) messageMap.get("conversationId");
         String userMessage = (String) messageMap.get("message");
 
-        // Xử lý tin nhắn và lấy phản hồi từ AI
-        String aiResponse = googleAiService.callGeminiApi(userMessage);
+        // Fetch conversation history
+        List<Message> conversationHistory = conversationService.getMessagesByConversationId(conversationId);
 
-        // Lưu tin nhắn và phản hồi vào cơ sở dữ liệu
+        // Limit the number of messages to include in the context (e.g., last 10 messages)
+        int maxContextMessages = 10;
+        int startIndex = Math.max(0, conversationHistory.size() - maxContextMessages);
+        conversationHistory = conversationHistory.subList(startIndex, conversationHistory.size());
+
+        // Convert history to Gemini API format
+        List<Map<String, String>> messages = conversationHistory.stream()
+                .map(msg -> {
+                    Map<String, String> m = new HashMap<>();
+                    m.put("role", msg.getSender().equals("GEMINI") ? "model" : "user");
+                    m.put("content", msg.getContent());
+                    return m;
+                })
+                .collect(Collectors.toList());
+
+        // Add the new user message
+        messages.add(Map.of("role", "user", "content", userMessage));
+
+        // Call Gemini API with the conversation history
+        String aiResponse = googleAiService.callGeminiApi(messages);
+
+        // Save user message and AI response
         conversationService.addMessageToConversation(conversationId, username, userMessage, "text");
         conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse, "text");
 
-        // Trả về phản hồi để gửi qua WebSocket
         return aiResponse;
     }
 
@@ -91,16 +112,30 @@ public class ChatWebGeminiController {
         }
 
         try {
-            // Lưu tin nhắn người dùng
+            // Fetch conversation history
+            List<Message> conversationHistory = conversationService.getMessagesByConversationId(conversationId);
+
+            // Convert history to Gemini API format
+            List<Map<String, String>> messages = conversationHistory.stream()
+                    .map(msg -> {
+                        Map<String, String> m = new HashMap<>();
+                        m.put("role", msg.getSender().equals("GEMINI") ? "model" : "user");
+                        m.put("content", msg.getContent());
+                        return m;
+                    })
+                    .collect(Collectors.toList());
+
+            // Add the new user message
+            messages.add(Map.of("role", "user", "content", messageContent));
+
+            // Call the AI API with the entire conversation history
+            String aiResponse = googleAiService.callGeminiApi(messages);
+
+            // Save user and AI messages
             Message userMessage = conversationService.addMessageToConversation(conversationId, username, messageContent, "text");
-
-            // Gọi API AI để lấy phản hồi
-            String aiResponse = googleAiService.callGeminiApi(messageContent);
-
-            // Lưu phản hồi AI
             Message aiMessage = conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse, "text");
 
-            // Trả về cả tin nhắn người dùng và phản hồi AI
+            // Return both user and AI messages in the response
             Map<String, Message> response = new HashMap<>();
             response.put("userMessage", userMessage);
             response.put("aiMessage", aiMessage);
@@ -110,6 +145,7 @@ public class ChatWebGeminiController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing message: " + e.getMessage());
         }
     }
+
     @PutMapping("/{conversationId}/title")
     public ResponseEntity<?> updateConversationTitle(@PathVariable String conversationId, @RequestBody Map<String, String> requestBody) {
         String newTitle = requestBody.get("title");

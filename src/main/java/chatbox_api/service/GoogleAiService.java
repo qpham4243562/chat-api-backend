@@ -10,10 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class GoogleAiService {
@@ -30,19 +27,26 @@ public class GoogleAiService {
         this.restTemplate = restTemplate;
     }
 
-    public String callGeminiApi(String inputText) {
+    public String callGeminiApi(List<Map<String, String>> messages) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
 
+        List<Map<String, Object>> contents = new ArrayList<>();
+        for (Map<String, String> message : messages) {
+            Map<String, Object> content = new HashMap<>();
+            content.put("role", message.get("role"));
+            content.put("parts", List.of(Map.of("text", message.get("content"))));
+            contents.add(content);
+        }
+
         Map<String, Object> body = new HashMap<>();
-        body.put("contents", List.of(Map.of("parts", List.of(Map.of("text", inputText)))));
+        body.put("contents", contents);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         String url = googleApiUrl + "?key=" + googleApiKey;
 
-        // Thêm log để theo dõi
-        System.out.println("Sending request to Google AI with text: " + inputText);
+        System.out.println("Sending request to Google AI with messages: " + messages);
         ResponseEntity<String> response = restTemplate.exchange(
                 url,
                 HttpMethod.POST,
@@ -54,7 +58,6 @@ public class GoogleAiService {
         System.out.println("Extracted response from Google AI: " + result);
         return result;
     }
-
 
     public String callGeminiApiWithImage(byte[] imageBytes) {
         HttpHeaders headers = new HttpHeaders();
