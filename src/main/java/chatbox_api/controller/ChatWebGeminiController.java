@@ -42,13 +42,8 @@ public class ChatWebGeminiController {
         String conversationId = (String) messageMap.get("conversationId");
         String userMessage = (String) messageMap.get("message");
 
-        // Fetch conversation history
+        // Fetch entire conversation history
         List<Message> conversationHistory = conversationService.getMessagesByConversationId(conversationId);
-
-        // Limit the number of messages to include in the context (e.g., last 10 messages)
-        int maxContextMessages = 10;
-        int startIndex = Math.max(0, conversationHistory.size() - maxContextMessages);
-        conversationHistory = conversationHistory.subList(startIndex, conversationHistory.size());
 
         // Convert history to Gemini API format
         List<Map<String, String>> messages = conversationHistory.stream()
@@ -73,7 +68,6 @@ public class ChatWebGeminiController {
         return aiResponse;
     }
 
-
     @GetMapping("/{conversationId}")
     public List<Message> getMessagesByConversationId(@PathVariable String conversationId) {
         Conversation conversation = conversationService.findById(conversationId);
@@ -81,15 +75,27 @@ public class ChatWebGeminiController {
     }
 
     @GetMapping("/by-username")
-    public List<Conversation> getConversationsByUsername(@RequestParam String username) {
-        return conversationService.findConversationsByUsername(username);
+    public ResponseEntity<?> getConversationsByUsername(@RequestParam String username) {
+        // Gọi tới service để tìm kiếm cuộc hội thoại
+        List<Conversation> conversations = conversationService.findConversationsByUsername(username);
+
+        // Nếu không có cuộc hội thoại, trả về thông báo JSON với mã trạng thái 404
+        if (conversations.isEmpty()) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Chưa có cuộc hội thoại nào cho người dùng này.");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        // Nếu có dữ liệu, trả về danh sách cuộc hội thoại với mã trạng thái 200 OK
+        return ResponseEntity.ok(conversations);
     }
+
 
     @PostMapping("/create")
     public Conversation createConversation(@RequestBody Map<String, String> requestBody) {
         String username = requestBody.get("username");
 
-        // Tạo một cuộc hội thoại mới nhưng chưa có tiêu đề (title)
+        // Create a new conversation without a title (initial message)
         String conversationId = conversationService.createNewConversation(username, "");
 
         return conversationService.findById(conversationId);
@@ -99,6 +105,7 @@ public class ChatWebGeminiController {
     public void deleteConversation(@PathVariable String conversationId) {
         conversationService.deleteById(conversationId);
     }
+
     @PostMapping("/{conversationId}/messages")
     public ResponseEntity<?> addMessageToConversation(
             @PathVariable String conversationId,
@@ -112,7 +119,7 @@ public class ChatWebGeminiController {
         }
 
         try {
-            // Fetch conversation history
+            // Fetch the entire conversation history
             List<Message> conversationHistory = conversationService.getMessagesByConversationId(conversationId);
 
             // Convert history to Gemini API format

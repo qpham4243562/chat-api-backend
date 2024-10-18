@@ -86,14 +86,23 @@ public class ConversationService {
 
     public List<Conversation> findConversationsByUsername(String username) {
         try {
-            List<Conversation> conversations = conversationRepository.findByUsername(encrypt(username));
+            // Mã hóa username trước khi tìm kiếm
+            String encryptedUsername = encrypt(username);
+
+            // Tìm kiếm danh sách cuộc hội thoại dựa trên username đã mã hóa
+            List<Conversation> conversations = conversationRepository.findByUsername(encryptedUsername);
+
+            // Giải mã các cuộc hội thoại trước khi trả về
             return conversations.stream()
                     .map(this::decryptConversation)
                     .collect(Collectors.toList());
         } catch (Exception e) {
+            // Ném lỗi nếu có vấn đề xảy ra trong quá trình tìm kiếm hoặc giải mã
             throw new RuntimeException("Error finding conversations", e);
         }
     }
+
+
 
     private Conversation decryptConversation(Conversation conversation) {
         try {
