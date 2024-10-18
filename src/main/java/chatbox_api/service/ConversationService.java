@@ -186,4 +186,12 @@ public class ConversationService {
     public void addImageToConversation(String conversationId, String sender, String imageBase64) {
         addMessageToConversation(conversationId, sender, imageBase64, "image");
     }
+
+    public List<Message> getMessagesByConversationId(String conversationId) {
+        Conversation conversation = findById(conversationId);
+        return conversation.getMessages();
+    }
 }
+
+
+
