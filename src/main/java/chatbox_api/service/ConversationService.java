@@ -6,20 +6,20 @@ import chatbox_api.repository.ConversationRepository;
 import org.springframework.stereotype.Service;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
+import java.util.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class ConversationService {
 
+    private final AnalyticsService analyticsService;
     private final ConversationRepository conversationRepository;
     private final String SECRET_KEY = "YourSecretKey123"; // Thay thế bằng khóa bí mật an toàn của bạn
 
-    public ConversationService(ConversationRepository conversationRepository) {
+    public ConversationService(ConversationRepository conversationRepository, AnalyticsService analyticsService) {
         this.conversationRepository = conversationRepository;
+        this.analyticsService = analyticsService;
     }
 
     private String encrypt(String data) throws Exception {
@@ -134,6 +134,8 @@ public class ConversationService {
 
     public Message addMessageToConversation(String conversationId, String sender, String content, String contentType) {
         try {
+            long startTime = System.currentTimeMillis();
+
             Conversation conversation = conversationRepository.findById(conversationId)
                     .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
 
@@ -150,10 +152,21 @@ public class ConversationService {
             }
 
             conversationRepository.save(conversation);
+
+            long responseTime = System.currentTimeMillis() - startTime;
+            analyticsService.updateAnalytics(conversationId, responseTime);
+
             return decryptMessage(message);
         } catch (Exception e) {
             throw new RuntimeException("Error adding message to conversation", e);
         }
+    }
+    public Map<String, Object> getOverallAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("totalProcessedQuestions", analyticsService.getTotalProcessedQuestions());
+        analytics.put("averageResponseTime", analyticsService.getOverallAverageResponseTime());
+        analytics.put("totalUniqueUsers", analyticsService.getTotalUniqueUsers());
+        return analytics;
     }
 
     public Conversation findById(String conversationId) {
