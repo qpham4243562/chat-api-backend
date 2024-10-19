@@ -2,6 +2,7 @@ package chatbox_api.controller;
 
 import chatbox_api.model.Conversation;
 import chatbox_api.model.Message;
+import chatbox_api.service.AnalyticsService;
 import chatbox_api.service.ConversationService;
 import chatbox_api.service.GoogleAiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,10 +27,12 @@ public class ChatWebGeminiController {
 
     private final GoogleAiService googleAiService;
     private final ConversationService conversationService;
+    private final AnalyticsService analyticsService;
 
-    public ChatWebGeminiController(GoogleAiService googleAiService, ConversationService conversationService) {
+    public ChatWebGeminiController(GoogleAiService googleAiService, ConversationService conversationService,AnalyticsService analyticsService) {
         this.googleAiService = googleAiService;
         this.conversationService = conversationService;
+        this.analyticsService=analyticsService;
     }
 
     @MessageMapping("/chat")
@@ -165,5 +168,18 @@ public class ChatWebGeminiController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating title: " + e.getMessage());
         }
+    }
+    @GetMapping("/analytics")
+    public ResponseEntity<?> getOverallAnalytics() {
+        int totalProcessedQuestions = analyticsService.getTotalProcessedQuestions();
+        double averageResponseTime = analyticsService.getOverallAverageResponseTime();
+        int totalUniqueUsers = analyticsService.getTotalUniqueUsers();
+
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("totalProcessedQuestions", totalProcessedQuestions);
+        analytics.put("averageResponseTime", averageResponseTime);
+        analytics.put("totalUniqueUsers", totalUniqueUsers);
+
+        return ResponseEntity.ok(analytics);
     }
 }
