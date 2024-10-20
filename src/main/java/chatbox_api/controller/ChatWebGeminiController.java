@@ -182,4 +182,18 @@ public class ChatWebGeminiController {
 
         return ResponseEntity.ok(analytics);
     }
+    @DeleteMapping("/by-username")
+    public ResponseEntity<?> deleteAllConversationsByUsername(@RequestParam String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Username is required");
+        }
+
+        try {
+            conversationService.deleteAllConversationsByUsername(username);
+            return ResponseEntity.ok().body("All conversations for user " + username + " have been deleted.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting conversations: " + e.getMessage());
+        }
+    }
+
 }

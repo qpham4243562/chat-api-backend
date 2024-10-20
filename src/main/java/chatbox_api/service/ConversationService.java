@@ -213,6 +213,12 @@ public class ConversationService {
         Conversation conversation = findById(conversationId);
         return conversation.getMessages();
     }
+    public void deleteAllConversationsByUsername(String username) {
+        List<Conversation> conversations = conversationRepository.findByUsername(username);
+        for (Conversation conversation : conversations) {
+            conversationRepository.delete(conversation);
+        }
+    }
 }
 
 
