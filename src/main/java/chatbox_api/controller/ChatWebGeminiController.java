@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,28 +46,18 @@ public class ChatWebGeminiController {
         String conversationId = (String) messageMap.get("conversationId");
         String userMessage = (String) messageMap.get("message");
 
-        // Fetch entire conversation history
-        List<Message> conversationHistory = conversationService.getMessagesByConversationId(conversationId);
+        // Fetch conversation history and format for Gemini
+        List<Map<String, String>> formattedHistory = getFormattedConversationHistory(conversationId);
 
-        // Convert history to Gemini API format
-        List<Map<String, String>> messages = conversationHistory.stream()
-                .map(msg -> {
-                    Map<String, String> m = new HashMap<>();
-                    m.put("role", msg.getSender().equals("GEMINI") ? "model" : "user");
-                    m.put("content", msg.getContent());
-                    return m;
-                })
-                .collect(Collectors.toList());
+        // Add current message
+        formattedHistory.add(createMessageMap("user", userMessage));
 
-        // Add the new user message
-        messages.add(Map.of("role", "user", "content", userMessage));
+        // Call Gemini with formatted history
+        String aiResponse = googleAiService.callGeminiApi(formattedHistory);
 
-        // Call Gemini API with the conversation history
-        String aiResponse = googleAiService.callGeminiApi(messages);
-
-        // Save user message and AI response
+        // Save both messages
         conversationService.addMessageToConversation(conversationId, username, userMessage, "text");
-        conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse, "text");
+        conversationService.addMessageToConversation(conversationId, "Cherry", aiResponse, "text");
 
         return aiResponse;
     }
@@ -122,38 +113,55 @@ public class ChatWebGeminiController {
         }
 
         try {
-            // Fetch the entire conversation history
-            List<Message> conversationHistory = conversationService.getMessagesByConversationId(conversationId);
+            // Get formatted history including system prompt
+            List<Map<String, String>> formattedHistory = getFormattedConversationHistory(conversationId);
 
-            // Convert history to Gemini API format
-            List<Map<String, String>> messages = conversationHistory.stream()
-                    .map(msg -> {
-                        Map<String, String> m = new HashMap<>();
-                        m.put("role", msg.getSender().equals("GEMINI") ? "model" : "user");
-                        m.put("content", msg.getContent());
-                        return m;
-                    })
-                    .collect(Collectors.toList());
+            // Add current message
+            formattedHistory.add(createMessageMap("user", messageContent));
 
-            // Add the new user message
-            messages.add(Map.of("role", "user", "content", messageContent));
+            // Call Gemini with complete history
+            String aiResponse = googleAiService.callGeminiApi(formattedHistory);
 
-            // Call the AI API with the entire conversation history
-            String aiResponse = googleAiService.callGeminiApi(messages);
+            // Save messages
+            Message userMessage = conversationService.addMessageToConversation(
+                    conversationId, username, messageContent, "text");
+            Message aiMessage = conversationService.addMessageToConversation(
+                    conversationId, "Cherry", aiResponse, "text");
 
-            // Save user and AI messages
-            Message userMessage = conversationService.addMessageToConversation(conversationId, username, messageContent, "text");
-            Message aiMessage = conversationService.addMessageToConversation(conversationId, "GEMINI", aiResponse, "text");
-
-            // Return both user and AI messages in the response
             Map<String, Message> response = new HashMap<>();
             response.put("userMessage", userMessage);
             response.put("aiMessage", aiMessage);
 
             return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing message: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body("Error processing message: " + e.getMessage());
         }
+    }
+    private List<Map<String, String>> getFormattedConversationHistory(String conversationId) {
+        List<Message> history = conversationService.getMessagesByConversationId(conversationId);
+        List<Map<String, String>> formattedHistory = new ArrayList<>();
+
+        // Add system prompt as first message
+        formattedHistory.add(createMessageMap("system",
+                "You are Cherry, a helpful AI assistant. Be concise but friendly in your responses." +
+                        "Remember previous context from our conversation to provide more relevant answers."));
+
+        // Format existing messages
+        for (Message msg : history) {
+            String role = msg.getSender().equals("Cherry") ? "model" : "user";
+            formattedHistory.add(createMessageMap(role, msg.getContent()));
+        }
+
+        return formattedHistory;
+    }
+
+    private Map<String, String> createMessageMap(String role, String content) {
+        Map<String, String> message = new HashMap<>();
+        message.put("role", role);
+        message.put("content", content);
+        return message;
     }
 
     @PutMapping("/{conversationId}/title")
@@ -171,12 +179,12 @@ public class ChatWebGeminiController {
     }
     @GetMapping("/analytics")
     public ResponseEntity<?> getOverallAnalytics() {
-        int totalProcessedQuestions = analyticsService.getTotalProcessedQuestions();
+        int totalProcessedResponses = analyticsService.getTotalProcessedResponses();
         double averageResponseTime = analyticsService.getOverallAverageResponseTime();
         int totalUniqueUsers = analyticsService.getTotalUniqueUsers();
 
         Map<String, Object> analytics = new HashMap<>();
-        analytics.put("totalProcessedQuestions", totalProcessedQuestions);
+        analytics.put("totalProcessedResponses", totalProcessedResponses);
         analytics.put("averageResponseTime", averageResponseTime);
         analytics.put("totalUniqueUsers", totalUniqueUsers);
 

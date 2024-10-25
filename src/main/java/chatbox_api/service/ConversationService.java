@@ -147,23 +147,22 @@ public class ConversationService {
             );
             conversation.getMessages().add(message);
 
-            if (conversation.getMessages().size() == 1 && !sender.equals("GEMINI") && decrypt(conversation.getTitle()).isEmpty()) {
-                conversation.setTitle(encrypt(content));
-            }
-
             conversationRepository.save(conversation);
 
-            long responseTime = System.currentTimeMillis() - startTime;
-            analyticsService.updateAnalytics(conversationId, responseTime);
+            if (sender.equals("Cherry")) {
+                long responseTime = System.currentTimeMillis() - startTime;
+                analyticsService.updateAnalytics(conversationId, responseTime);
+            }
 
             return decryptMessage(message);
         } catch (Exception e) {
             throw new RuntimeException("Error adding message to conversation", e);
         }
     }
+
     public Map<String, Object> getOverallAnalytics() {
         Map<String, Object> analytics = new HashMap<>();
-        analytics.put("totalProcessedQuestions", analyticsService.getTotalProcessedQuestions());
+        analytics.put("totalProcessedQuestions", analyticsService.getTotalProcessedResponses());
         analytics.put("averageResponseTime", analyticsService.getOverallAverageResponseTime());
         analytics.put("totalUniqueUsers", analyticsService.getTotalUniqueUsers());
         return analytics;

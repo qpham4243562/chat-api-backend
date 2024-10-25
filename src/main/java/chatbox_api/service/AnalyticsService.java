@@ -8,7 +8,6 @@ import java.util.List;
 
 @Service
 public class AnalyticsService {
-
     private final ConversationRepository conversationRepository;
 
     public AnalyticsService(ConversationRepository conversationRepository) {
@@ -18,21 +17,28 @@ public class AnalyticsService {
     public void updateAnalytics(String conversationId, long responseTime) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found"));
-        conversation.incrementProcessedQuestions();
+        // Only increment counter for AI responses
+        conversation.incrementProcessedResponses();
         conversation.addResponseTime(responseTime);
         conversationRepository.save(conversation);
     }
 
-    public int getTotalProcessedQuestions() {
+    public int getTotalProcessedResponses() { // Changed from getTotalProcessedQuestions
         List<Conversation> allConversations = conversationRepository.findAll();
-        return allConversations.stream().mapToInt(Conversation::getProcessedQuestions).sum();
+        return allConversations.stream()
+                .mapToInt(Conversation::getProcessedResponses)
+                .sum();
     }
 
     public double getOverallAverageResponseTime() {
         List<Conversation> allConversations = conversationRepository.findAll();
-        long totalProcessedQuestions = allConversations.stream().mapToInt(Conversation::getProcessedQuestions).sum();
-        long totalResponseTime = allConversations.stream().mapToLong(Conversation::getTotalResponseTime).sum();
-        return totalProcessedQuestions > 0 ? (double) totalResponseTime / totalProcessedQuestions : 0;
+        long totalProcessedResponses = allConversations.stream()
+                .mapToInt(Conversation::getProcessedResponses)
+                .sum();
+        long totalResponseTime = allConversations.stream()
+                .mapToLong(Conversation::getTotalResponseTime)
+                .sum();
+        return totalProcessedResponses > 0 ? (double) totalResponseTime / totalProcessedResponses : 0;
     }
 
     public int getTotalUniqueUsers() {

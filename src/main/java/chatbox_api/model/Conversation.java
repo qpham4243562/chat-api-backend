@@ -14,7 +14,7 @@ public class Conversation {
     private List<Message> messages;
     private String timestamp;
     private String username;
-    private int processedQuestions;
+    private int processedResponses;
     private long totalResponseTime;
 
     public Conversation() {
@@ -76,12 +76,16 @@ public class Conversation {
         }
         this.messages.add(message);
     }
-    public int getProcessedQuestions() {
-        return processedQuestions;
+    public int getProcessedResponses() { // Changed from getProcessedQuestions
+        return processedResponses;
     }
 
-    public void setProcessedQuestions(int processedQuestions) {
-        this.processedQuestions = processedQuestions;
+    public void setProcessedResponses(int processedResponses) { // Changed from setProcessedQuestions
+        this.processedResponses = processedResponses;
+    }
+
+    public void incrementProcessedResponses() { // Changed from incrementProcessedQuestions
+        this.processedResponses++;
     }
 
     public long getTotalResponseTime() {
@@ -92,16 +96,12 @@ public class Conversation {
         this.totalResponseTime = totalResponseTime;
     }
 
-    public void incrementProcessedQuestions() {
-        this.processedQuestions++;
-    }
-
     public void addResponseTime(long responseTime) {
         this.totalResponseTime += responseTime;
     }
 
     public double getAverageResponseTime() {
-        return processedQuestions > 0 ? (double) totalResponseTime / processedQuestions : 0;
+        return processedResponses > 0 ? (double) totalResponseTime / processedResponses : 0;
     }
 }
 
