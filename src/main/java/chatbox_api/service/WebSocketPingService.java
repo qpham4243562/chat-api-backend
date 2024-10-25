@@ -12,8 +12,8 @@ public class WebSocketPingService {
     public WebSocketPingService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
-    
-    @Scheduled(fixedDelay = 180000)
+
+    @Scheduled(fixedRate = 60000)
     public void sendWebSocketPing() {
         try {
             // Gửi tin nhắn 'ping' tới một endpoint WebSocket.
