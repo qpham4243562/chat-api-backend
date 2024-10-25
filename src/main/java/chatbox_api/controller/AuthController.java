@@ -272,7 +272,7 @@ public class AuthController {
             String resetToken = generateResetToken();
             user.setResetToken(resetToken);
             userRepository.save(user);
-            
+
             String subject = "Password Reset Request";
             String text = "Click the link below to reset your password: \n" + resetToken;
             emailService.sendEmail(user.getEmail(), subject, text);
