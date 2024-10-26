@@ -5,11 +5,11 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 
 @Controller
-public class HeartbeatController {
+public class WebSocketController {
 
     @MessageMapping("/ping")
     @SendTo("/topic/pong")
-    public String handlePing(String message) {
-        return "pong";
+    public String handlePing() {
+        return "pong-" + System.currentTimeMillis();
     }
 }
