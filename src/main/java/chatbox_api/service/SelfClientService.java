@@ -1,11 +1,13 @@
 package chatbox_api.service;
 
 import jakarta.annotation.PreDestroy;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Service;
-import org.springframework.web.socket.client.WebSocketClient;
 
 import java.net.URI;
+import java.util.Date;
 
 @Service
 public class SelfClientService implements InitializingBean {
@@ -23,7 +25,7 @@ public class SelfClientService implements InitializingBean {
         try {
             client = new WebSocketClient(new URI(SERVER_URL)) {
                 @Override
-                public void onOpen(ServerHandshake handshake) {
+                public void onOpen(ServerHandshake handshakedata) {
                     System.out.println("Self Client Connected: " + new Date());
                 }
 
@@ -56,6 +58,7 @@ public class SelfClientService implements InitializingBean {
                         Thread.sleep(30000);
                         if (client.isOpen()) {
                             client.send("ping");
+                            System.out.println("Ping sent at: " + new Date());
                         }
                     } catch (Exception e) {
                         System.err.println("Self Client Error: " + e.getMessage());
