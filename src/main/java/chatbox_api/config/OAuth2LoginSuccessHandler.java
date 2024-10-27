@@ -40,11 +40,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         OAuth2AuthenticationToken oauth2Token = (OAuth2AuthenticationToken) authentication;
 
-        // Lấy thông tin người dùng từ OAuth2
+ 
         String email = oauth2Token.getPrincipal().getAttribute("email");
         String name = oauth2Token.getPrincipal().getAttribute("name");
 
-        // Kiểm tra thông tin email và name có null không
         if (email == null || name == null) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "User information is incomplete.");
             return;
@@ -53,29 +52,22 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         // Tìm hoặc tạo mới người dùng trong database
         User user = userRepository.findByEmail(email).orElseGet(() -> registerNewUser(email, name));
 
-        // Kiểm tra role của người dùng và tạo JWT token
-        String role = (user.getRole() != null) ? user.getRole() : "USER";
+        // Tạo JWT token cho người dùng
         String jwt = jwtUtil.generateToken(new org.springframework.security.core.userdetails.User(
-                user.getUsername(), "", AuthorityUtils.createAuthorityList("ROLE_" + role)));
+                user.getUsername(), "", AuthorityUtils.createAuthorityList("ROLE_" + user.getRole())));
 
-        // Tạo và thêm cookie chứa JWT token vào phản hồi
-        Cookie jwtCookie = new Cookie("JWT_TOKEN", jwt);
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setSecure(true); // Đặt là true nếu bạn sử dụng HTTPS
-        jwtCookie.setMaxAge(24 * 60 * 60); // Thiết lập thời gian hết hạn, ví dụ: 1 ngày
-        jwtCookie.setPath("/");
-        response.addCookie(jwtCookie);
+        // Chuyển hướng người dùng tới frontend kèm theo JWT token và thông tin người dùng
+        String redirectUrl = String.format(
+                "http://localhost:3000/callback?jwtToken=%s&userId=%s&username=%s&email=%s",
+                jwt,
+                user.getId(),
+                user.getUsername(),
+                user.getEmail()
+        );
 
-        // Tạo phản hồi ApiResponse trả về JWT và thông tin người dùng
-        ApiResponse<Object> apiResponse = createApiResponse(user, jwt);
-
-        // Thiết lập header phản hồi JSON
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-
-        // Ghi dữ liệu JSON vào phản hồi
-        objectMapper.writeValue(response.getWriter(), apiResponse);
+        response.sendRedirect(redirectUrl);
     }
+
 
     // Phương thức hỗ trợ để đăng ký người dùng mới nếu không tồn tại
     private User registerNewUser(String email, String name) {

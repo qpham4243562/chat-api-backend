@@ -325,4 +325,5 @@ public class AuthController {
         response.sendRedirect("/oauth2/authorization/google");
     }
 
+
 }
