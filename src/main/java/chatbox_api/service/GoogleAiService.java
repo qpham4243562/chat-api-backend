@@ -139,51 +139,31 @@ public class GoogleAiService {
         Map<String, Object> body = new HashMap<>();
         body.put("contents", List.of(content));
 
-        // Add generation config for image analysis
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.4);  // Lower temperature for more focused image description
-        generationConfig.put("maxOutputTokens", 1024);
-        body.put("generationConfig", generationConfig);
-
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         String url = googleApiUrl + "?key=" + googleApiKey;
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                entity,
+                String.class
+        );
 
-        try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            return extractTextFromResponse(response.getBody());
-        } catch (Exception e) {
-            System.err.println("Error processing image: " + e.getMessage());
-            return handleError(e);
-        }
+        return extractTextFromResponse(response.getBody());
     }
+
 
     private String extractTextFromResponse(String responseBody) {
         ObjectMapper objectMapper = new ObjectMapper();
+        String text = "";
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode candidates = root.path("candidates");
-            if (candidates.isEmpty()) {
-                throw new RuntimeException("No response candidates found");
-            }
-            return candidates.get(0)
-                    .path("content")
-                    .path("parts")
-                    .get(0)
-                    .path("text")
-                    .asText();
+            text = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
         } catch (Exception e) {
-            System.err.println("Error extracting text from response: " + e.getMessage());
-            throw new RuntimeException("Failed to process AI response", e);
+            e.printStackTrace();
         }
+        return text;
     }
-
     private String handleError(Exception e) {
         String errorMessage = e.getMessage();
         if (errorMessage.contains("429")) {
